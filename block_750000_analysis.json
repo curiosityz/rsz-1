@@ -1,0 +1,13 @@
+{
+  "analysis_metadata": {
+    "blocks_analyzed": 0,
+    "transactions_processed": 2496,
+    "signatures_extracted": 3576,
+    "r_value_reuse_count": 0,
+    "unique_addresses": 0,
+    "analysis_duration": 0.10117053985595703,
+    "error_count": 0,
+    "export_timestamp": 1754465357.0105178
+  },
+  "vulnerabilities": []
+}

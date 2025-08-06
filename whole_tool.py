@@ -775,10 +775,9 @@ class ChainstackClient:
     def get_latest_block_number(self) -> int:
         """Get the latest block number with robust error handling"""
         try:
-            result = self._make_request('eth_blockNumber', [])
-            if isinstance(result, str) and result.startswith('0x'):
-                return int(result, 16)
-            elif isinstance(result, int):
+            # Use Bitcoin getblockcount RPC method
+            result = self._make_request('getblockcount', [])
+            if isinstance(result, int):
                 return result
             else:
                 raise ValueError(f"Unexpected block number format: {result}")
@@ -791,17 +790,25 @@ class ChainstackClient:
             if block_number < 0:
                 raise ValueError("Block number cannot be negative")
             
-            block_param = hex(block_number)
-            result = self._make_request('eth_getBlockByNumber', [block_param, full_transactions])
+            # First get the block hash using Bitcoin getblockhash RPC method
+            block_hash = self._make_request('getblockhash', [block_number])
+            
+            # Then get the block details using getblock
+            # verbosity=2 for full transaction details
+            result = self._make_request('getblock', [block_hash, 2 if full_transactions else 1])
             
             if result is None:
                 raise Exception(f"Block {block_number} not found")
             
             # Validate block structure
-            required_fields = ['number', 'hash', 'transactions']
+            required_fields = ['hash', 'tx']
             for field in required_fields:
                 if field not in result:
                     print(f"Warning: Block {block_number} missing field '{field}'")
+            
+            # Add height field if not present
+            if 'height' not in result:
+                result['height'] = block_number
             
             return result
             
@@ -983,6 +990,7 @@ class ECDSAAffineAttack:
             
             # Check if this is a Bitcoin transaction (has hex field)
             elif 'hex' in tx and BITCOIN_LIB_AVAILABLE:
+                print(f"Found Bitcoin transaction with hex: {tx['hash']}")
                 # Bitcoin transaction - extract all signatures from all inputs
                 tx_hex = tx['hex']
                 
@@ -1068,14 +1076,19 @@ class ECDSAAffineAttack:
             total_blocks = end_block - start_block + 1
             processed_blocks = 0
             
+            print(f"Analysis start block: {start_block}, end block: {end_block}")
+            print(f"Total blocks to process: {total_blocks}")
+            
             for batch_start in range(start_block, end_block + 1, 50):
                 batch_end = min(batch_start + 49, end_block)
                 
                 try:
-                    print(f"Processing batch: blocks {batch_start}-{batch_end}")
+                    print(f"\nProcessing batch: blocks {batch_start}-{batch_end}")
+                    print("Fetching blocks from Chainstack...")
                     
                     # Get blocks with robust error handling
                     blocks = self.chainstack_client.get_block_range(batch_start, batch_end)
+                    print(f"Received {len(blocks)} blocks from Chainstack")
                     
                     for block in blocks:
                         if not block or 'transactions' not in block:
